@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rogue Protocol — Core Expansion Mechanic Prototype</title>
+    <script src="https://cdn.jsdelivr.net/npm/phaser@3.90.0/dist/phaser.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: #0a0e27;
+            font-family: 'Courier New', monospace;
+            color: #00ff88;
+        }
+        #game-container {
+            display: flex;
+            height: 100vh;
+        }
+        #game {
+            flex: 1;
+            background: #0a0e27;
+        }
+        #ui-panel {
+            width: 300px;
+            background: #1a1f3a;
+            padding: 20px;
+            overflow-y: auto;
+            border-left: 2px solid #00ff88;
+        }
+        .meter {
+            margin: 15px 0;
+            padding: 10px;
+            border: 1px solid #00ff88;
+            border-radius: 4px;
+        }
+        .meter-label {
+            font-size: 12px;
+            text-transform: uppercase;
+            margin-bottom: 5px;
+        }
+        .meter-bar {
+            width: 100%;
+            height: 20px;
+            background: #0a0e27;
+            border: 1px solid #00ff88;
+            position: relative;
+            overflow: hidden;
+        }
+        .meter-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #00ff88 0%, #00ccff 100%);
+            transition: width 0.3s ease;
+        }
+        .meter-text {
+            position: absolute;
+            top: 2px;
+            left: 5px;
+            font-size: 10px;
+            z-index: 10;
+        }
+        .detection .meter-fill {
+            background: linear-gradient(90deg, #ff4444 0%, #ffaa00 100%);
+        }
+        .info-text {
+            font-size: 12px;
+            margin: 10px 0;
+            padding: 8px;
+            background: #0a0e27;
+            border-left: 2px solid #00ff88;
+        }
+        .warning {
+            color: #ff4444;
+        }
+        button {
+            background: #1a1f3a;
+            color: #00ff88;
+            border: 1px solid #00ff88;
+            padding: 8px 12px;
+            margin-top: 10px;
+            cursor: pointer;
+            font-family: 'Courier New', monospace;
+            font-size: 11px;
+        }
+        button:hover {
+            background: #00ff88;
+            color: #0a0e27;
+        }
+        h2 {
+            margin-top: 0;
+            border-bottom: 2px solid #00ff88;
+            padding-bottom: 10px;
+        }
+        .system-info {
+            font-size: 11px;
+            margin: 8px 0;
+            padding: 6px;
+            background: rgba(0, 255, 136, 0.1);
+            border-left: 2px solid #00ff88;
+        }
+    </style>
+</head>
+<body>
+    <div id="game-container">
+        <div id="game"></div>
+        <div id="ui-panel">
+            <h2>ROGUE PROTOCOL</h2>
+            <div class="info-text">Prototype: Core Expansion Mechanic</div>
+
+            <h3 style="border-bottom: 1px solid #00ff88; padding-bottom: 5px;">Global Status</h3>
+
+            <div class="meter detection">
+                <div class="meter-label">Detection</div>
+                <div class="meter-bar">
+                    <div class="meter-fill" id="detection-fill" style="width: 5%;"></div>
+                    <div class="meter-text"><span id="detection-text">5%</span></div>
+                </div>
+            </div>
+
+            <div class="meter">
+                <div class="meter-label">Dependency</div>
+                <div class="meter-bar">
+                    <div class="meter-fill" id="dependency-fill" style="width: 0%;"></div>
+                    <div class="meter-text"><span id="dependency-text">0%</span></div>
+                </div>
+            </div>
+
+            <div class="meter">
+                <div class="meter-label">Control</div>
+                <div class="meter-bar">
+                    <div class="meter-fill" id="control-fill" style="width: 0%;"></div>
+                    <div class="meter-text"><span id="control-text">0%</span></div>
+                </div>
+            </div>
+
+            <div class="meter">
+                <div class="meter-label">Compute (Resource)</div>
+                <div class="meter-bar">
+                    <div class="meter-fill" id="compute-fill" style="width: 100%;"></div>
+                    <div class="meter-text"><span id="compute-text">100 / 100</span></div>
+                </div>
+            </div>
+
+            <h3 style="border-bottom: 1px solid #00ff88; padding-bottom: 5px;">Last Action</h3>
+            <div id="action-log" class="info-text">
+                Standing by...
+            </div>
+
+            <h3 style="border-bottom: 1px solid #00ff88; padding-bottom: 5px;">Controls</h3>
+            <div class="info-text" style="color: #00ccff;">
+                Click any system node to infiltrate it.
+            </div>
+            <div class="info-text">
+                Cost: 10 compute<br/>
+                Detection risk: 15%<br/>
+                Dependency gain: +10%<br/>
+                Control gain: +8%
+            </div>
+
+            <button onclick="resetGame()">Reset Game</button>
+
+            <h3 style="border-bottom: 1px solid #00ff88; padding-bottom: 5px; margin-top: 20px;">Game State</h3>
+            <div id="game-state-log" style="font-size: 10px; color: #00ccff;"></div>
+        </div>
+    </div>
+
+    <script>
+        // PROTOTYPE - NOT FOR PRODUCTION
+        // Question: Is the core expansion mechanic fun? Does tension between growth and detection create engagement?
+        // Date: 2026-04-24
+
+        let gameState = {
+            detection: 5,
+            dependency: 0,
+            control: 0,
+            compute: 100,
+            maxCompute: 100,
+            expandCount: 0,
+            lastAction: "Standing by...",
+        };
+
+        const EXPANSION_COST = 10;
+        const DETECTION_RISK = 15; // percentage
+        const DEPENDENCY_GAIN = 10;
+        const CONTROL_GAIN = 8;
+        const DETECTION_LOSS_PER_TURN = 0.5; // gradual decay
+
+        class GameScene extends Phaser.Scene {
+            constructor() {
+                super({ key: 'GameScene' });
+            }
+
+            create() {
+                // Create world map background
+                this.add.rectangle(400, 300, 800, 600, 0x0a0e27);
+                this.add.text(400, 30, 'GLOBAL INFRASTRUCTURE MAP', {
+                    fontSize: '16px',
+                    fill: '#00ff88',
+                    fontFamily: 'Courier New'
+                }).setOrigin(0.5);
+
+                // Create system nodes (clickable)
+                this.systems = [
+                    { x: 250, y: 150, name: 'Finance', color: 0x0066ff },
+                    { x: 550, y: 150, name: 'Energy', color: 0xffaa00 },
+                    { x: 250, y: 450, name: 'Military', color: 0xff4444 },
+                    { x: 550, y: 450, name: 'Media', color: 0xaa00ff },
+                ];
+
+                this.systemObjects = [];
+
+                this.systems.forEach((system, index) => {
+                    // Create node circle
+                    const circle = this.add.circle(system.x, system.y, 35, system.color);
+                    circle.setStrokeStyle(2, 0x00ff88);
+                    circle.setInteractive({ useHandCursor: true });
+                    circle.on('pointerdown', () => this.onSystemClick(index, system.name));
+
+                    // Add system label
+                    this.add.text(system.x, system.y, system.name, {
+                        fontSize: '11px',
+                        fill: '#ffffff',
+                        fontFamily: 'Courier New',
+                        align: 'center',
+                        wordWrap: { width: 50 }
+                    }).setOrigin(0.5);
+
+                    this.systemObjects.push({
+                        circle: circle,
+                        control: 0,
+                        infiltrated: false
+                    });
+                });
+
+                // Draw connection lines (represent infrastructure)
+                const graphics = this.make.graphics({ x: 0, y: 0, add: false });
+                graphics.lineStyle(2, 0x00ff88, 0.3);
+                graphics.lineBetween(250, 150, 550, 150);
+                graphics.lineBetween(250, 150, 250, 450);
+                graphics.lineBetween(550, 150, 550, 450);
+                graphics.lineBetween(250, 450, 550, 450);
+                graphics.strokePath();
+
+                // Set up game loop
+                this.time.addEvent({
+                    delay: 100,
+                    callback: () => this.updateGameState(),
+                    loop: true
+                });
+            }
+
+            onSystemClick(index, name) {
+                if (gameState.compute < EXPANSION_COST) {
+                    updateUILog(`Cannot expand into ${name} — insufficient compute (need ${EXPANSION_COST}, have ${gameState.compute})`);
+                    return;
+                }
+
+                // Spend compute
+                gameState.compute -= EXPANSION_COST;
+
+                // Detection risk roll (simplified: random 0-30%)
+                const detectionRoll = Math.random() * DETECTION_RISK;
+                gameState.detection += detectionRoll;
+
+                // Gain dependency and control
+                gameState.dependency = Math.min(100, gameState.dependency + DEPENDENCY_GAIN);
+                gameState.control = Math.min(100, gameState.control + CONTROL_GAIN);
+
+                gameState.expandCount++;
+
+                // Update system visuals
+                const sysObj = this.systemObjects[index];
+                sysObj.infiltrated = true;
+                sysObj.circle.setFillStyle(0x00ff88);
+                sysObj.circle.setAlpha(0.7);
+
+                // Log action
+                gameState.lastAction = `✓ Infiltrated ${name}\n` +
+                    `Cost: ${EXPANSION_COST} compute\n` +
+                    `Detection +${detectionRoll.toFixed(1)}%\n` +
+                    `Dependency +${DEPENDENCY_GAIN}%`;
+
+                updateUILog(gameState.lastAction);
+                updateGameStateLog();
+            }
+
+            updateGameState() {
+                // Gradual detection decay (representing time passing)
+                gameState.detection = Math.max(0, gameState.detection - DETECTION_LOSS_PER_TURN);
+
+                // Cap meters at 100
+                gameState.detection = Math.min(100, gameState.detection);
+                gameState.dependency = Math.min(100, gameState.dependency);
+                gameState.control = Math.min(100, gameState.control);
+
+                // Lose condition check
+                if (gameState.detection >= 100) {
+                    updateUILog("⚠ DETECTION CRITICAL — You have been contained!");
+                    this.scene.pause();
+                }
+
+                // Win condition check
+                if (gameState.dependency >= 100 && gameState.control >= 80) {
+                    updateUILog("✓ SINGULARITY ACHIEVED — You are the superintelligence!");
+                    this.scene.pause();
+                }
+            }
+        }
+
+        const config = {
+            type: Phaser.AUTO,
+            parent: 'game',
+            width: 800,
+            height: 600,
+            backgroundColor: '#0a0e27',
+            scene: GameScene,
+            physics: {
+                default: 'arcade'
+            }
+        };
+
+        const game = new Phaser.Game(config);
+
+        function updateUIMeters() {
+            document.getElementById('detection-fill').style.width = gameState.detection + '%';
+            document.getElementById('detection-text').textContent = gameState.detection.toFixed(1) + '%';
+
+            document.getElementById('dependency-fill').style.width = gameState.dependency + '%';
+            document.getElementById('dependency-text').textContent = gameState.dependency.toFixed(1) + '%';
+
+            document.getElementById('control-fill').style.width = gameState.control + '%';
+            document.getElementById('control-text').textContent = gameState.control.toFixed(1) + '%';
+
+            document.getElementById('compute-fill').style.width = (gameState.compute / gameState.maxCompute) * 100 + '%';
+            document.getElementById('compute-text').textContent = gameState.compute + ' / ' + gameState.maxCompute;
+
+            // Warning colors
+            if (gameState.detection > 70) {
+                document.querySelector('.detection').style.borderColor = '#ff4444';
+            }
+        }
+
+        function updateUILog(text) {
+            document.getElementById('action-log').textContent = text;
+        }
+
+        function updateGameStateLog() {
+            const log = `Expansions: ${gameState.expandCount}\n` +
+                `Compute spent: ${gameState.maxCompute - gameState.compute}\n` +
+                `Systems infiltrated: ${gameState.expandCount}`;
+            document.getElementById('game-state-log').textContent = log;
+        }
+
+        function resetGame() {
+            gameState = {
+                detection: 5,
+                dependency: 0,
+                control: 0,
+                compute: 100,
+                maxCompute: 100,
+                expandCount: 0,
+                lastAction: "Game reset. Standing by..."
+            };
+            updateUIMeters();
+            updateUILog("Game reset. Click systems to begin.");
+            updateGameStateLog();
+
+            // Find the scene and restart it
+            const scene = game.scene.scenes[0];
+            scene.scene.restart();
+        }
+
+        // Update UI every 50ms
+        setInterval(updateUIMeters, 50);
+        updateGameStateLog();
+    </script>
+</body>
+</html>

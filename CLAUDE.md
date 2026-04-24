@@ -5,22 +5,22 @@ Each agent owns a specific domain, enforcing separation of concerns and quality.
 
 ## Technology Stack
 
-- **Engine**: [CHOOSE: Godot 4 / Unity / Unreal Engine 5]
-- **Language**: [CHOOSE: GDScript / C# / C++ / Blueprint]
+- **Framework**: Phaser 3 v3.90.0 (HTML5 / JavaScript / TypeScript)
+- **Language**: TypeScript (primary), JavaScript (compatible)
 - **Version Control**: Git with trunk-based development
-- **Build System**: [SPECIFY after choosing engine]
-- **Asset Pipeline**: [SPECIFY after choosing engine]
+- **Build System**: Webpack / Vite (bundler + dev server)
+- **Package Manager**: npm / yarn
+- **Asset Pipeline**: Image compression, sprite sheet generation, asset bundling via Webpack
 
-> **Note**: Engine-specialist agents exist for Godot, Unity, and Unreal with
-> dedicated sub-specialists. Use the set matching your engine.
+> **Note**: Phaser is a lightweight web framework. There is no engine-specialist routing — use `lead-programmer` and `gameplay-programmer` for code review. Web-specific concerns (bundling, browser compatibility, performance profiling) are handled by `technical-director`.
 
 ## Project Structure
 
 @.claude/docs/directory-structure.md
 
-## Engine Version Reference
+## Framework Version Reference
 
-@docs/engine-reference/godot/VERSION.md
+@docs/engine-reference/phaser/VERSION.md
 
 ## Technical Preferences
 
